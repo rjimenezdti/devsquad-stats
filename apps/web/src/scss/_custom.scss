@@ -1,0 +1,145 @@
+//
+// App-specific tweaks layered on top of the AdminKit theme.
+//
+
+// Make the illustration icon in stat cards sit in a soft tinted circle,
+// matching the modern AdminKit PRO look.
+.stat {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// ApexCharts: inherit the theme font and tame default margins inside cards.
+.apexcharts-canvas {
+  font-family: $font-family-sans-serif !important;
+}
+
+.apexcharts-tooltip {
+  box-shadow: $box-shadow-lg !important;
+  border: 0 !important;
+}
+
+// Small, muted delta label used under KPI numbers.
+.kpi-delta {
+  font-size: $font-size-sm;
+
+  &.is-up {
+    color: $success;
+  }
+
+  &.is-down {
+    color: $danger;
+  }
+}
+
+// Loading / empty states centered inside a card body.
+.state-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 180px;
+  color: $gray-600;
+  gap: 0.75rem;
+}
+
+// Clickable sidebar links rendered as react-router NavLink.
+.sidebar-link {
+  cursor: pointer;
+}
+
+//
+// Professional KPI card (used on the Keytia dashboard).
+//
+.kpi-card {
+  position: relative;
+  border: 1px solid rgba($black, 0.05);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+
+  // Thin colored accent strip on the left.
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--kpi-accent, #{$primary});
+  }
+
+  &:hover {
+    box-shadow: 0 0.5rem 1.25rem rgba($black, 0.08);
+    transform: translateY(-2px);
+  }
+
+  .kpi-label {
+    font-size: 0.7rem;
+    font-weight: $font-weight-bold;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: $gray-600;
+  }
+
+  .kpi-value {
+    font-size: 1.9rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: $gray-900;
+  }
+
+  .kpi-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 0.65rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: color-mix(in srgb, var(--kpi-accent, #{$primary}) 14%, transparent);
+    color: var(--kpi-accent, #{$primary});
+  }
+
+  .kpi-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-bold;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: $gray-100;
+    color: $gray-600;
+
+    &.is-up {
+      background: color-mix(in srgb, #{$success} 14%, transparent);
+      color: color-mix(in srgb, #{$success} 82%, black);
+    }
+    &.is-down {
+      background: color-mix(in srgb, #{$danger} 14%, transparent);
+      color: $danger;
+    }
+  }
+}
+
+//
+// Filter bar (date controls) on the Keytia dashboard.
+//
+.filter-bar {
+  .filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .filter-label {
+    font-size: 0.7rem;
+    font-weight: $font-weight-bold;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: $gray-600;
+  }
+}

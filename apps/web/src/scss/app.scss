@@ -1,0 +1,66 @@
+/*!
+ * DevSquad Stats — styling based on AdminKit v3.5.0 (MIT, https://adminkit.io/)
+ * Copyright 2023 Paul Laros / AdminKit. Adapted for a React + Vite build.
+ */
+
+// Variables
+@import "1-variables/app";
+
+// Bootstrap (resolved from node_modules via Vite sass loadPaths)
+@import "bootstrap/scss/functions";
+@import "bootstrap/scss/variables";
+@import "bootstrap/scss/maps";
+@import "bootstrap/scss/mixins";
+@import "bootstrap/scss/utilities";
+@import "bootstrap/scss/root";
+@import "bootstrap/scss/reboot";
+@import "bootstrap/scss/type";
+@import "bootstrap/scss/images";
+@import "bootstrap/scss/containers";
+@import "bootstrap/scss/grid";
+@import "bootstrap/scss/tables";
+@import "bootstrap/scss/forms";
+@import "bootstrap/scss/buttons";
+@import "bootstrap/scss/transitions";
+@import "bootstrap/scss/dropdown";
+@import "bootstrap/scss/button-group";
+@import "bootstrap/scss/nav";
+@import "bootstrap/scss/navbar";
+@import "bootstrap/scss/card";
+@import "bootstrap/scss/badge";
+@import "bootstrap/scss/progress";
+@import "bootstrap/scss/list-group";
+@import "bootstrap/scss/close";
+@import "bootstrap/scss/spinners";
+@import "bootstrap/scss/helpers";
+@import "bootstrap/scss/utilities/api";
+
+// Theme mixins
+@import "2-mixins/button";
+
+// Theme components
+@import "3-components/avatar";
+@import "3-components/buttons";
+@import "3-components/card";
+@import "3-components/chart";
+@import "3-components/content";
+@import "3-components/dropdown";
+@import "3-components/feather";
+@import "3-components/footer";
+@import "3-components/hamburger";
+@import "3-components/list-group";
+@import "3-components/main";
+@import "3-components/navbar";
+@import "3-components/reboot";
+@import "3-components/sidebar";
+@import "3-components/sizing";
+@import "3-components/stat";
+@import "3-components/tables";
+@import "3-components/type";
+@import "3-components/wrapper";
+
+// Theme utilities
+@import "4-utilities/cursors";
+
+// App-specific overrides
+@import "custom";
