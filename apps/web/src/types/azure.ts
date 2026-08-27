@@ -99,6 +99,19 @@ export interface ClientStoryCount {
   total: number;
 }
 
+export interface StoryListItem {
+  id: number;
+  client: string;
+  title: string;
+  type: string;
+  createdDate: string | null;
+  createdBy: string;
+  state: string;
+  urgent: boolean;
+  /** Scheduled delivery date (ISO), used for the traffic-light indicator. */
+  scheduledDate: string | null;
+}
+
 export interface MonthCount {
   month: string;
   count: number;
@@ -109,11 +122,23 @@ export interface MonthClientMatrix {
   series: { client: string; data: number[] }[];
 }
 
+export interface ClientTypeMatrix {
+  clients: string[];
+  series: { type: string; data: number[] }[];
+}
+
 export interface UserStoriesReport {
   totalStories: number;
   totalOpen: number;
   totalResolved: number;
+  /** Non-removed stories flagged urgent. */
+  totalUrgent: number;
+  /** Count of Bug-type work items in scope. */
+  totalBugs: number;
   byClient: ClientStoryCount[];
   finishedByMonth: MonthCount[];
   openByMonthByClient: MonthClientMatrix;
+  byClientByType: ClientTypeMatrix;
+  openStories: StoryListItem[];
+  bugs: StoryListItem[];
 }

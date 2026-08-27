@@ -106,6 +106,21 @@ export interface ClientStoryCount {
   total: number;
 }
 
+/** A single work item row for the detail listings (open stories, bugs). */
+export interface StoryListItem {
+  id: number;
+  client: string;
+  title: string;
+  type: string;
+  createdDate: string | null;
+  createdBy: string;
+  state: string;
+  /** Whether the item is flagged urgent (see UserStoriesConfig.urgentField). */
+  urgent: boolean;
+  /** Scheduled delivery date (ISO), used for the traffic-light indicator. */
+  scheduledDate: string | null;
+}
+
 export interface MonthCount {
   /** ISO month, e.g. "2026-08". */
   month: string;
@@ -118,11 +133,30 @@ export interface MonthClientMatrix {
   series: { client: string; data: number[] }[];
 }
 
+/**
+ * Clients on the axis, one stacked series per "Tipo". `data` aligns to `clients`.
+ * Clients are sorted by total volume (descending).
+ */
+export interface ClientTypeMatrix {
+  clients: string[];
+  series: { type: string; data: number[] }[];
+}
+
 export interface UserStoriesReport {
   totalStories: number;
   totalOpen: number;
   totalResolved: number;
+  /** Non-removed stories flagged urgent (see UserStoriesConfig.urgentField). */
+  totalUrgent: number;
+  /** Count of Bug-type work items in the source's project scope. */
+  totalBugs: number;
   byClient: ClientStoryCount[];
   finishedByMonth: MonthCount[];
   openByMonthByClient: MonthClientMatrix;
+  /** Client × Tipo breakdown over open US + Bugs (for "Requerimientos por cliente"). */
+  byClientByType: ClientTypeMatrix;
+  /** Open (non-resolved, non-removed) user stories, newest first. */
+  openStories: StoryListItem[];
+  /** Bug-type work items in scope, newest first. */
+  bugs: StoryListItem[];
 }

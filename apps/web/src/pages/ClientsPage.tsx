@@ -1,6 +1,15 @@
 import { useState } from 'react';
-import { Layers, Circle, CheckCircle, Users, Calendar, X } from 'react-feather';
-import { useUserStories, useMeta } from '@/features/azure/hooks';
+import {
+  Layers,
+  Circle,
+  CheckCircle,
+  Calendar,
+  X,
+  AlertTriangle,
+  AlertOctagon,
+  Filter,
+} from 'react-feather';
+import { useUserStories } from '@/features/azure/hooks';
 import { SOURCE } from '@/features/azure/api';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { KpiCard } from '@/components/ui/KpiCard';
@@ -9,42 +18,57 @@ import { LoadingState, ErrorState, EmptyState } from '@/components/ui/states';
 import { DonutChart } from '@/components/charts/DonutChart';
 import { ColumnChart } from '@/components/charts/ColumnChart';
 import { toErrorMessage } from '@/lib/apiClient';
-import { palette, clientColors } from '@/lib/theme';
-import { formatNumber, formatPercent, formatMonth } from '@/lib/format';
-import type { ClientStoryCount, MonthClientMatrix, UserStoriesReport } from '@/types/azure';
+import { differenceInCalendarDays } from 'date-fns';
+import { palette } from '@/lib/theme';
+import { formatNumber, formatPercent, formatDate } from '@/lib/format';
+import type {
+  ClientStoryCount,
+  ClientTypeMatrix,
+  StoryListItem,
+  UserStoriesReport,
+} from '@/types/azure';
 
 /** Max clients shown in a chart before the rest fold into "Otros". */
-const TOP_CLIENTS_BAR = 15;
-const TOP_CLIENTS_STACK = 8;
+const TOP_CLIENTS_BAR = 6;
+const TOP_CLIENTS_DONUT = 7;
+
+/** Palette shared by "Abiertas por cliente" (donut) and "Requerimientos por cliente". */
+const REQ_TYPE_PALETTE = [
+  '#36566d',
+  '#357988',
+  '#afc5a1',
+  '#fdcd7b',
+  '#8f4953',
+  '#7a825d',
+  '#3a584a',
+  '#62808a',
+  '#203740',
+  '#aedbda',
+];
 
 export function ClientsPage() {
   const [createdFrom, setCreatedFrom] = useState('');
-  const [closedFrom, setClosedFrom] = useState('');
+  const [category, setCategory] = useState<Category>('all');
 
   const { data, isLoading, isFetching, isError, error } = useUserStories(SOURCE.keytia, {
     createdFrom,
-    closedFrom,
+    category,
   });
-  const { data: meta } = useMeta(SOURCE.keytia);
 
-  const hasFilters = Boolean(createdFrom || closedFrom);
+  const hasFilters = Boolean(createdFrom) || category !== 'all';
 
   return (
     <>
-      <PageHeader title="Keytia" highlight="· User Stories por Cliente">
-        <span className="badge bg-primary-subtle text-primary fs-6">
-          {meta?.defaultProject ? `Proyecto: ${meta.defaultProject}` : 'Organización Keytia'}
-        </span>
-      </PageHeader>
+      <PageHeader title="Keytia" highlight="· User Stories por Cliente" />
 
       <FilterBar
         createdFrom={createdFrom}
-        closedFrom={closedFrom}
         onCreatedFrom={setCreatedFrom}
-        onClosedFrom={setClosedFrom}
+        category={category}
+        onCategory={setCategory}
         onClear={() => {
           setCreatedFrom('');
-          setClosedFrom('');
+          setCategory('all');
         }}
         hasFilters={hasFilters}
         busy={isFetching}
@@ -52,25 +76,28 @@ export function ClientsPage() {
 
       {isLoading && <LoadingState label="Consultando user stories de Keytia…" />}
       {isError && <ErrorState message={toErrorMessage(error)} />}
-      {data && data.totalStories === 0 && (
+      {data && data.totalOpen === 0 && (
         <EmptyState
           message={
             hasFilters
-              ? 'No hay user stories que cumplan los filtros de fecha seleccionados.'
-              : 'No se encontraron user stories en KeytiaDev Backlog.'
+              ? 'No hay elementos que cumplan los filtros seleccionados.'
+              : 'No se encontraron elementos abiertos en KeytiaDev Backlog.'
           }
         />
       )}
-      {data && data.totalStories > 0 && <ClientsContent data={data} />}
+      {data && data.totalOpen > 0 && <ClientsContent data={data} />}
     </>
   );
 }
 
+/** Element category filter for the listings. */
+type Category = 'all' | 'us' | 'bugs';
+
 interface FilterBarProps {
   createdFrom: string;
-  closedFrom: string;
   onCreatedFrom: (v: string) => void;
-  onClosedFrom: (v: string) => void;
+  category: Category;
+  onCategory: (c: Category) => void;
   onClear: () => void;
   hasFilters: boolean;
   busy: boolean;
@@ -78,9 +105,9 @@ interface FilterBarProps {
 
 function FilterBar({
   createdFrom,
-  closedFrom,
   onCreatedFrom,
-  onClosedFrom,
+  category,
+  onCategory,
   onClear,
   hasFilters,
   busy,
@@ -99,23 +126,25 @@ function FilterBar({
               type="date"
               className="form-control form-control-sm"
               value={createdFrom}
-              max={closedFrom || undefined}
               onChange={(e) => onCreatedFrom(e.target.value)}
             />
           </div>
 
           <div className="filter-field">
-            <label htmlFor="closedFrom" className="filter-label">
-              <Calendar size={12} className="me-1" />
-              Entregadas (cerradas) desde
+            <label htmlFor="category" className="filter-label">
+              <Filter size={12} className="me-1" />
+              Categoría
             </label>
-            <input
-              id="closedFrom"
-              type="date"
-              className="form-control form-control-sm"
-              value={closedFrom}
-              onChange={(e) => onClosedFrom(e.target.value)}
-            />
+            <select
+              id="category"
+              className="form-select form-select-sm"
+              value={category}
+              onChange={(e) => onCategory(e.target.value as Category)}
+            >
+              <option value="all">Todos</option>
+              <option value="us">User stories</option>
+              <option value="bugs">Bugs</option>
+            </select>
           </div>
 
           {hasFilters && (
@@ -137,53 +166,148 @@ function FilterBar({
   );
 }
 
-/** Keeps the top `n` clients by total and folds the rest into a single "Otros". */
-function capByClient(rows: ClientStoryCount[], n: number): ClientStoryCount[] {
-  if (rows.length <= n) return rows;
-  const top = rows.slice(0, n);
-  const otros = rows.slice(n).reduce(
-    (acc, c) => ({
-      client: 'Otros',
-      open: acc.open + c.open,
-      resolved: acc.resolved + c.resolved,
-      total: acc.total + c.total,
-    }),
-    { client: 'Otros', open: 0, resolved: 0, total: 0 },
-  );
-  return [...top, otros];
+/** Sort by scheduled delivery date ascending; items without a date go last. */
+function byScheduledAsc(a: StoryListItem, b: StoryListItem): number {
+  if (a.scheduledDate && b.scheduledDate) return a.scheduledDate.localeCompare(b.scheduledDate);
+  if (a.scheduledDate) return -1;
+  if (b.scheduledDate) return 1;
+  return 0;
 }
 
-/** Caps the stacked month×client matrix to the top `n` clients by open volume. */
-function capMatrix(matrix: MonthClientMatrix, n: number): MonthClientMatrix {
-  if (matrix.series.length <= n) return matrix;
-  const withTotals = matrix.series.map((s) => ({ s, total: s.data.reduce((a, b) => a + b, 0) }));
-  withTotals.sort((a, b) => b.total - a.total);
-  const top = withTotals.slice(0, n).map((x) => x.s);
-  const rest = withTotals.slice(n).map((x) => x.s);
-  const otros = {
-    client: 'Otros',
-    data: matrix.months.map((_, i) => rest.reduce((sum, s) => sum + s.data[i], 0)),
-  };
-  return { months: matrix.months, series: [...top, otros] };
+/** Whole calendar days elapsed from an ISO date to today (null date → null). */
+function daysSince(iso: string | null): number | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return differenceInCalendarDays(new Date(), date);
+}
+
+type Semaforo = 'red' | 'yellow' | 'green' | 'none';
+
+/**
+ * Traffic light from the scheduled delivery date vs. today:
+ * past due → red; within the next 3 days → yellow; further out → green.
+ * No scheduled date → none (neutral).
+ */
+function semaforoFor(scheduledDate: string | null): Semaforo {
+  if (!scheduledDate) return 'none';
+  const date = new Date(scheduledDate);
+  if (Number.isNaN(date.getTime())) return 'none';
+  const diff = differenceInCalendarDays(date, new Date());
+  if (diff < 0) return 'red';
+  if (diff <= 3) return 'yellow';
+  return 'green';
+}
+
+const SEMAFORO_COLOR: Record<Semaforo, string> = {
+  red: palette.danger,
+  yellow: palette.warning,
+  green: palette.success,
+  none: palette.gray300,
+};
+
+const SEMAFORO_TITLE: Record<Semaforo, string> = {
+  red: 'Entrega vencida',
+  yellow: 'Entrega próxima (≤ 3 días)',
+  green: 'Entrega lejana (> 3 días)',
+  none: 'Sin fecha programada',
+};
+
+/**
+ * Per-client totals for the distribution donut: top `n` clients (by total) plus
+ * an "Otros" slice for the remainder. `byClient` is already sorted by total.
+ */
+function clientDistribution(rows: ClientStoryCount[], n: number): { client: string; value: number }[] {
+  const dist = rows.map((c) => ({ client: c.client, value: c.total }));
+  if (dist.length <= n) return dist;
+  const otros = dist.slice(n).reduce((sum, c) => sum + c.value, 0);
+  return [...dist.slice(0, n), { client: 'Otros', value: otros }];
+}
+
+/**
+ * Keeps the top `n` clients (already sorted by total) and folds the rest into a
+ * single "Otros" column, summing each Tipo series.
+ */
+function capClientTypeMatrix(matrix: ClientTypeMatrix, n: number): ClientTypeMatrix {
+  if (matrix.clients.length <= n) return matrix;
+  const clients = [...matrix.clients.slice(0, n), 'Otros'];
+  const series = matrix.series.map((s) => ({
+    type: s.type,
+    data: [...s.data.slice(0, n), s.data.slice(n).reduce((a, b) => a + b, 0)],
+  }));
+  return { clients, series };
+}
+
+
+/** US + Bugs without a scheduled delivery date: days since creation + author. */
+function NoScheduleTable({ items }: { items: StoryListItem[] }) {
+  return (
+    <div className="card flex-fill">
+      <div className="card-header">
+        <h5 className="card-title mb-0">Requerimientos sin fecha programada ({items.length})</h5>
+      </div>
+      <div className="table-responsive item-table-scroll">
+        <table className="table table-hover my-0">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Cliente</th>
+              <th>Título</th>
+              <th>Creado por</th>
+              <th className="text-end text-nowrap">Días transcurridos</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="text-center text-muted py-3">
+                  Sin elementos.
+                </td>
+              </tr>
+            ) : (
+              items.map((it) => {
+                const days = daysSince(it.createdDate);
+                return (
+                  <tr key={it.id}>
+                    <td>{it.id}</td>
+                    <td>{it.client}</td>
+                    <td>{it.title}</td>
+                    <td>{it.createdBy || '—'}</td>
+                    <td className="text-end">{days === null ? '—' : formatNumber(days)}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 function ClientsContent({ data }: { data: UserStoriesReport }) {
   const resolvedRate = data.totalStories ? data.totalResolved / data.totalStories : 0;
 
-  const barClients = capByClient(data.byClient, TOP_CLIENTS_BAR);
-  const matrix = capMatrix(data.openByMonthByClient, TOP_CLIENTS_STACK);
-  const monthCats = matrix.months.map(formatMonth);
-  const monthSeries = matrix.series.map((s) => ({ name: s.client, data: s.data }));
-  const monthColors = clientColors(matrix.series.map((s) => s.client));
+  const typeMatrix = capClientTypeMatrix(data.byClientByType, TOP_CLIENTS_BAR);
+  const clientDist = clientDistribution(data.byClient, TOP_CLIENTS_DONUT);
+  // Backend already scopes openStories/bugs to the selected category.
+  const allItems = [...data.openStories, ...data.bugs];
+  const statusItems = allItems.filter((it) => it.scheduledDate).sort(byScheduledAsc);
+  const noScheduleItems = allItems
+    .filter((it) => !it.scheduledDate)
+    .sort((a, b) => (a.createdDate ?? '').localeCompare(b.createdDate ?? ''));
 
   return (
     <>
       {/* KPIs */}
       <div className="row">
-        <div className="col-sm-6 col-xxl-3 d-flex">
+        <div className="col-sm-6 col-xl d-flex">
           <KpiCard label="User stories" value={formatNumber(data.totalStories)} icon={Layers} accent={palette.primary} />
         </div>
-        <div className="col-sm-6 col-xxl-3 d-flex">
+        <div className="col-sm-6 col-xl d-flex">
+          <KpiCard label="Bugs" value={formatNumber(data.totalBugs)} icon={AlertOctagon} accent={palette.orange} />
+        </div>
+        <div className="col-sm-6 col-xl d-flex">
           <KpiCard
             label="Abiertas"
             value={formatNumber(data.totalOpen)}
@@ -192,7 +316,7 @@ function ClientsContent({ data }: { data: UserStoriesReport }) {
             hint={{ text: `${formatPercent(data.totalStories ? data.totalOpen / data.totalStories : 0)} del total` }}
           />
         </div>
-        <div className="col-sm-6 col-xxl-3 d-flex">
+        <div className="col-sm-6 col-xl d-flex">
           <KpiCard
             label="Resueltas"
             value={formatNumber(data.totalResolved)}
@@ -201,120 +325,131 @@ function ClientsContent({ data }: { data: UserStoriesReport }) {
             hint={{ text: `${formatPercent(resolvedRate)} del total`, tone: 'up' }}
           />
         </div>
-        <div className="col-sm-6 col-xxl-3 d-flex">
-          <KpiCard label="Clientes" value={formatNumber(data.byClient.length)} icon={Users} accent={palette.purple} />
+        <div className="col-sm-6 col-xl d-flex">
+          <KpiCard
+            label="Urgentes"
+            value={formatNumber(data.totalUrgent)}
+            icon={AlertTriangle}
+            accent={palette.danger}
+            hint={{
+              text: `${formatPercent(data.totalStories ? data.totalUrgent / data.totalStories : 0)} del total`,
+              tone: 'down',
+            }}
+          />
         </div>
       </div>
 
-      {/* Abierto vs Resuelto + Por cliente */}
+      {/* Distribución por cliente + Requerimientos por cliente */}
       <div className="row">
         <div className="col-12 col-lg-4 d-flex">
-          <ChartCard title="Abiertas vs. Resueltas">
+          <ChartCard title="Abiertas por cliente" subtitle={`Top ${TOP_CLIENTS_DONUT} por volumen`}>
             <DonutChart
-              labels={['Abiertas', 'Resueltas']}
-              series={[data.totalOpen, data.totalResolved]}
-              colors={[palette.warning, palette.success]}
-              centerLabel="Total"
+              labels={clientDist.map((c) => c.client)}
+              series={clientDist.map((c) => c.value)}
+              colors={clientDist.map((_, i) => REQ_TYPE_PALETTE[i % REQ_TYPE_PALETTE.length])}
+              centerLabel="Abiertas"
+              dataLabels={false}
             />
           </ChartCard>
         </div>
         <div className="col-12 col-lg-8 d-flex">
           <ChartCard
-            title="User stories por cliente"
-            subtitle={`Top ${TOP_CLIENTS_BAR} por volumen (abiertas vs. resueltas)`}
+            title="Requerimientos por cliente"
+            subtitle={`Top ${TOP_CLIENTS_BAR} por volumen (US + Bugs, apilado por tipo)`}
           >
             <ColumnChart
-              categories={barClients.map((c) => c.client)}
-              series={[
-                { name: 'Abiertas', data: barClients.map((c) => c.open) },
-                { name: 'Resueltas', data: barClients.map((c) => c.resolved) },
-              ]}
-              colors={[palette.warning, palette.success]}
+              categories={typeMatrix.clients}
+              series={typeMatrix.series.map((s) => ({ name: s.type, data: s.data }))}
+              colors={typeMatrix.series.map((_, i) => REQ_TYPE_PALETTE[i % REQ_TYPE_PALETTE.length])}
               stacked
               horizontal
               dataLabels={false}
-              height={Math.max(320, barClients.length * 34)}
+              height={Math.max(220, typeMatrix.clients.length * 44 + 40)}
             />
           </ChartCard>
         </div>
       </div>
 
-      {/* Finalizadas por mes */}
+      {/* Listado combinado US + Bugs con indicador tipo semáforo */}
       <div className="row">
         <div className="col-12 d-flex">
-          <ChartCard title="User stories finalizadas por mes" subtitle="Resueltas por mes de cierre">
-            <ColumnChart
-              categories={data.finishedByMonth.map((m) => formatMonth(m.month))}
-              series={[{ name: 'Finalizadas', data: data.finishedByMonth.map((m) => m.count) }]}
-              colors={[palette.success]}
-              height={300}
-              dataLabels={false}
-              yTitle="User stories"
-            />
-          </ChartCard>
+          <StatusTable items={statusItems} />
         </div>
       </div>
 
-      {/* Abiertas por mes y por cliente (stacked) */}
+      {/* Requerimientos sin fecha programada */}
       <div className="row">
         <div className="col-12 d-flex">
-          <ChartCard
-            title="User stories abiertas por mes y por cliente"
-            subtitle="Creadas por mes, apiladas por cliente"
-          >
-            {monthCats.length > 0 ? (
-              <ColumnChart
-                categories={monthCats}
-                series={monthSeries}
-                colors={monthColors}
-                stacked
-                dataLabels={false}
-                height={340}
-                yTitle="Abiertas"
-              />
-            ) : (
-              <div className="state-center">Sin user stories abiertas.</div>
-            )}
-          </ChartCard>
-        </div>
-      </div>
-
-      {/* Tabla resumen por cliente (completa) */}
-      <div className="row">
-        <div className="col-12 d-flex">
-          <div className="card flex-fill">
-            <div className="card-header">
-              <h5 className="card-title mb-0">Resumen por cliente ({data.byClient.length})</h5>
-            </div>
-            <div className="table-responsive">
-              <table className="table table-hover my-0">
-                <thead>
-                  <tr>
-                    <th>Cliente</th>
-                    <th className="text-end">Abiertas</th>
-                    <th className="text-end">Resueltas</th>
-                    <th className="text-end">Total</th>
-                    <th className="text-end">% Resuelto</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.byClient.map((c) => (
-                    <tr key={c.client}>
-                      <td>{c.client}</td>
-                      <td className="text-end">{formatNumber(c.open)}</td>
-                      <td className="text-end">{formatNumber(c.resolved)}</td>
-                      <td className="text-end">{formatNumber(c.total)}</td>
-                      <td className="text-end">
-                        {formatPercent(c.total ? c.resolved / c.total : 0)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <NoScheduleTable items={noScheduleItems} />
         </div>
       </div>
     </>
   );
 }
+
+/** Colored traffic-light dot driven by the scheduled delivery date. */
+function SemaforoDot({ scheduledDate }: { scheduledDate: string | null }) {
+  const status = semaforoFor(scheduledDate);
+  const title =
+    status === 'none'
+      ? SEMAFORO_TITLE.none
+      : `${SEMAFORO_TITLE[status]} · ${formatDate(scheduledDate)}`;
+  return (
+    <span
+      className="semaforo-dot"
+      style={{ backgroundColor: SEMAFORO_COLOR[status] }}
+      title={title}
+      aria-label={title}
+    />
+  );
+}
+
+/** Combined US + Bugs listing with the traffic-light indicator. */
+function StatusTable({ items }: { items: StoryListItem[] }) {
+  return (
+    <div className="card flex-fill">
+      <div className="card-header">
+        <h5 className="card-title mb-0">User stories y Bugs ({items.length})</h5>
+      </div>
+      <div className="table-responsive item-table-scroll">
+        <table className="table table-hover my-0">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Cliente</th>
+              <th>Título</th>
+              <th>Tipo</th>
+              <th>Estado</th>
+              <th className="text-nowrap">Fecha de entrega programada</th>
+              <th className="text-center">Semáforo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="text-center text-muted py-3">
+                  Sin elementos.
+                </td>
+              </tr>
+            ) : (
+              items.map((it) => (
+                <tr key={it.id} className={it.urgent ? 'row-urgent' : undefined}>
+                  <td>{it.id}</td>
+                  <td>{it.client}</td>
+                  <td>{it.title}</td>
+                  <td>{it.type}</td>
+                  <td>{it.state}</td>
+                  <td className="text-nowrap">{formatDate(it.scheduledDate)}</td>
+                  <td className="text-center">
+                    <SemaforoDot scheduledDate={it.scheduledDate} />
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+

@@ -126,6 +126,40 @@
 }
 
 //
+// Detail listing tables (open stories / bugs): cap height and keep the header
+// visible while the rows scroll.
+//
+.item-table-scroll {
+  max-height: 480px;
+  overflow-y: auto;
+
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: $white;
+  }
+}
+
+// Urgent rows in the combined US + Bugs table get a solid red background.
+// Override Bootstrap's per-cell background variable so it wins over hover/stripes.
+.table > tbody > tr.row-urgent > td {
+  --bs-table-bg: var(--bs-danger-bg-subtle);
+  --bs-table-accent-bg: var(--bs-danger-bg-subtle);
+  color: var(--bs-danger-text-emphasis);
+}
+
+// Traffic-light indicator dot in the combined US + Bugs table.
+.semaforo-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  vertical-align: middle;
+  box-shadow: inset 0 0 0 1px rgba($black, 0.15);
+}
+
+//
 // Filter bar (date controls) on the Keytia dashboard.
 //
 .filter-bar {

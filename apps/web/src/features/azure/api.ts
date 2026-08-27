@@ -86,11 +86,15 @@ export async function fetchVelocityOverview(
   return data;
 }
 
+export type Category = 'all' | 'us' | 'bugs';
+
 export interface UserStoriesFilters {
   /** Keep items created on/after this ISO date (yyyy-mm-dd). */
   createdFrom?: string;
   /** Keep items closed on/after this ISO date (yyyy-mm-dd). */
   closedFrom?: string;
+  /** Element category to include. Defaults to 'all'. */
+  category?: Category;
 }
 
 export async function fetchUserStories(
@@ -101,6 +105,7 @@ export async function fetchUserStories(
     params: {
       createdFrom: filters.createdFrom || undefined,
       closedFrom: filters.closedFrom || undefined,
+      category: filters.category && filters.category !== 'all' ? filters.category : undefined,
     },
   });
   return data;

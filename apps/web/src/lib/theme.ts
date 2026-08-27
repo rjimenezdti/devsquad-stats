@@ -18,17 +18,26 @@ export const palette = {
 
 /** A qualitative sequence for categorical series (states, types, assignees). */
 export const categorical = [
-  palette.primary,
-  palette.success,
-  palette.warning,
-  palette.danger,
-  palette.info,
-  palette.purple,
-  palette.orange,
-  palette.pink,
-  palette.teal,
-  palette.gray500,
+  '#012a4a',
+  '#013a63',
+  '#01497c',
+  '#014f86',
+  '#2a6f97',
+  '#2c7da0',
+  '#468faf',
+  '#61a5c2',
+  '#89c2d9',
+  '#a9d6e5',
 ] as const;
+
+/**
+ * Two-tone split from the blue ramp for the open-vs-resolved / finished series.
+ * Resolved reuses the same dark blue that `colorForState` assigns to "done".
+ */
+export const openResolved = {
+  open: '#61a5c2',
+  resolved: '#013a63',
+} as const;
 
 /**
  * Stable categorical colors for a list of clients (color follows the entity's
@@ -39,14 +48,14 @@ export function clientColors(clients: string[]): string[] {
 }
 
 /**
- * Best-effort mapping from common Azure DevOps states to a semantic color so
- * "Done" is green, "Active" blue, etc. Falls back to the categorical palette.
+ * Maps common Azure DevOps states onto the blue ramp so the same state keeps a
+ * stable shade (Done darkest → New lightest). Falls back to the ramp by index.
  */
 export function colorForState(state: string, index: number): string {
   const key = state.toLowerCase();
-  if (['done', 'closed', 'completed', 'resolved'].includes(key)) return palette.success;
-  if (['active', 'in progress', 'committed', 'doing'].includes(key)) return palette.primary;
-  if (['new', 'proposed', 'to do', 'approved'].includes(key)) return palette.gray500;
-  if (['blocked', 'removed'].includes(key)) return palette.danger;
+  if (['done', 'closed', 'completed', 'resolved'].includes(key)) return categorical[1]; // #013a63
+  if (['active', 'in progress', 'committed', 'doing'].includes(key)) return categorical[4]; // #2a6f97
+  if (['new', 'proposed', 'to do', 'approved'].includes(key)) return categorical[8]; // #89c2d9
+  if (['blocked', 'removed'].includes(key)) return categorical[6]; // #468faf
   return categorical[index % categorical.length];
 }

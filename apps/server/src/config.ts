@@ -29,6 +29,26 @@ export interface UserStoriesConfig {
   clientField: string;
   /** Backlog work item types to include. */
   types: string[];
+  /**
+   * Boolean work item field ref that flags urgency (e.g. "Custom.Urgente"). A US
+   * is urgent when this field is true. Empty disables the "urgent" metric.
+   */
+  urgentField: string;
+  /**
+   * Hard floor on System.CreatedDate applied at the source (WIQL). Items created
+   * before this ISO date (yyyy-mm-dd) are never fetched. Empty = no floor.
+   */
+  minCreatedDate: string;
+  /**
+   * Field ref used as "Tipo" to break a client's items into stacked series
+   * (e.g. "Custom.Type"). Empty = fall back to System.WorkItemType.
+   */
+  typeField: string;
+  /**
+   * Date field ref for the scheduled delivery date, used to drive the traffic
+   * light indicator (e.g. "Custom.Fechadeentregaprogramada"). Empty disables it.
+   */
+  scheduledField: string;
 }
 
 /** A single Azure DevOps organization the app can query. */
@@ -94,6 +114,10 @@ function buildSource(params: {
       project: params.userStories?.project ?? '',
       clientField: params.userStories?.clientField ?? '',
       types: params.userStories?.types ?? DEFAULT_BACKLOG_TYPES,
+      urgentField: params.userStories?.urgentField ?? '',
+      minCreatedDate: params.userStories?.minCreatedDate ?? '',
+      typeField: params.userStories?.typeField ?? '',
+      scheduledField: params.userStories?.scheduledField ?? '',
     },
   };
 }
@@ -137,6 +161,10 @@ export function loadConfig(): AppConfig {
         project: keytiaProject,
         clientField: optional('KEYTIA_CLIENT_FIELD', 'Custom.Cliente'),
         types: parseList(optional('KEYTIA_STORY_TYPES', 'User Story'), ['User Story']),
+        urgentField: optional('KEYTIA_URGENT_FIELD', 'Custom.Urgente'),
+        minCreatedDate: optional('KEYTIA_MIN_CREATED_DATE', ''),
+        typeField: optional('KEYTIA_TYPE_FIELD', 'Custom.Tipo'),
+        scheduledField: optional('KEYTIA_SCHEDULED_FIELD', 'Custom.Fechadeentregaprogramada'),
       },
     });
   }

@@ -102,10 +102,12 @@ export function createApiRouter(registry: SourceRegistry, config: AppConfig): Ro
     asyncHandler(async (req, res) => {
       const rt = resolve(req, res);
       if (!rt) return;
+      const category = queryString(req.query.category);
       res.json(
         await getUserStoriesReport(rt.clients, rt.source, {
           createdFrom: queryString(req.query.createdFrom),
           closedFrom: queryString(req.query.closedFrom),
+          category: category === 'us' || category === 'bugs' ? category : 'all',
         }),
       );
     }),

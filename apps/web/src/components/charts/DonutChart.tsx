@@ -8,13 +8,22 @@ interface DonutChartProps {
   height?: number;
   /** Big number shown in the center (defaults to the total). */
   centerLabel?: string;
+  /** Per-slice percentage labels. Defaults to true. */
+  dataLabels?: boolean;
 }
 
 /**
  * Donut for categorical distribution (e.g. work items by state). A legend plus
  * per-slice labels provide the secondary encoding the palette requires.
  */
-export function DonutChart({ labels, series, colors, height = 260, centerLabel }: DonutChartProps) {
+export function DonutChart({
+  labels,
+  series,
+  colors,
+  height = 260,
+  centerLabel,
+  dataLabels = true,
+}: DonutChartProps) {
   const total = series.reduce((a, b) => a + b, 0);
 
   const options: ApexOptions = {
@@ -24,7 +33,7 @@ export function DonutChart({ labels, series, colors, height = 260, centerLabel }
     stroke: { width: 2, colors: ['#fff'] },
     legend: { position: 'bottom', fontSize: '13px' },
     dataLabels: {
-      enabled: true,
+      enabled: dataLabels,
       formatter: (val: number) => `${Math.round(val)}%`,
     },
     plotOptions: {
