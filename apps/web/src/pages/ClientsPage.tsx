@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import {
   Layers,
-  Circle,
-  CheckCircle,
+  Clock,
+  AlertCircle,
   Calendar,
   X,
   AlertTriangle,
@@ -20,7 +20,7 @@ import { ColumnChart } from '@/components/charts/ColumnChart';
 import { toErrorMessage } from '@/lib/apiClient';
 import { differenceInCalendarDays } from 'date-fns';
 import { palette } from '@/lib/theme';
-import { formatNumber, formatPercent, formatDate } from '@/lib/format';
+import { formatNumber, formatDate } from '@/lib/format';
 import type {
   ClientStoryCount,
   ClientTypeMatrix,
@@ -286,8 +286,6 @@ function NoScheduleTable({ items }: { items: StoryListItem[] }) {
 }
 
 function ClientsContent({ data }: { data: UserStoriesReport }) {
-  const resolvedRate = data.totalStories ? data.totalResolved / data.totalStories : 0;
-
   const typeMatrix = capClientTypeMatrix(data.byClientByType, TOP_CLIENTS_BAR);
   const clientDist = clientDistribution(data.byClient, TOP_CLIENTS_DONUT);
   // Backend already scopes openStories/bugs to the selected category.
@@ -296,6 +294,15 @@ function ClientsContent({ data }: { data: UserStoriesReport }) {
   const noScheduleItems = allItems
     .filter((it) => !it.scheduledDate)
     .sort((a, b) => (a.createdDate ?? '').localeCompare(b.createdDate ?? ''));
+
+  // Traffic-light counts across all elements (items without a date are neutral).
+  let yellowCount = 0;
+  let redCount = 0;
+  for (const it of allItems) {
+    const s = semaforoFor(it.scheduledDate);
+    if (s === 'yellow') yellowCount += 1;
+    else if (s === 'red') redCount += 1;
+  }
 
   return (
     <>
@@ -309,20 +316,20 @@ function ClientsContent({ data }: { data: UserStoriesReport }) {
         </div>
         <div className="col-sm-6 col-xl d-flex">
           <KpiCard
-            label="Abiertas"
-            value={formatNumber(data.totalOpen)}
-            icon={Circle}
+            label="Semáforo amarillo"
+            value={formatNumber(yellowCount)}
+            icon={Clock}
             accent={palette.warning}
-            hint={{ text: `${formatPercent(data.totalStories ? data.totalOpen / data.totalStories : 0)} del total` }}
+            hint={{ text: 'Entrega ≤ 3 días' }}
           />
         </div>
         <div className="col-sm-6 col-xl d-flex">
           <KpiCard
-            label="Resueltas"
-            value={formatNumber(data.totalResolved)}
-            icon={CheckCircle}
-            accent={palette.success}
-            hint={{ text: `${formatPercent(resolvedRate)} del total`, tone: 'up' }}
+            label="Semáforo rojo"
+            value={formatNumber(redCount)}
+            icon={AlertCircle}
+            accent={palette.danger}
+            hint={{ text: 'Entrega vencida', tone: 'down' }}
           />
         </div>
         <div className="col-sm-6 col-xl d-flex">
@@ -331,10 +338,6 @@ function ClientsContent({ data }: { data: UserStoriesReport }) {
             value={formatNumber(data.totalUrgent)}
             icon={AlertTriangle}
             accent={palette.danger}
-            hint={{
-              text: `${formatPercent(data.totalStories ? data.totalUrgent / data.totalStories : 0)} del total`,
-              tone: 'down',
-            }}
           />
         </div>
       </div>
