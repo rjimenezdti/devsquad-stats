@@ -9,6 +9,8 @@ export interface WorkItemFields {
   'System.IterationPath'?: string;
   'System.Tags'?: string;
   'Microsoft.VSTS.Scheduling.StoryPoints'?: number;
+  'Custom.EstimatedEfforthrs'?: number;
+  'Custom.Type'?: string;
   'System.CreatedDate'?: string;
   'System.ChangedDate'?: string;
   [key: string]: unknown;
@@ -37,6 +39,10 @@ export interface WorkItemSummary {
   assignedTo: string;
   iterationPath: string;
   storyPoints: number | null;
+  /** "Impacto estimado" — Custom.EstimatedEfforthrs (estimated effort, hrs). */
+  estimatedImpact: number | null;
+  /** "Work type" — Custom.Type (Nuevo | Cambio (cliente) | Ajuste (dti)). */
+  workType: string;
   tags: string[];
 }
 

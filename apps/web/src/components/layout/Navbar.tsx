@@ -13,8 +13,11 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
   const { data: meta } = useMeta(SOURCE.devprojects);
   const queryClient = useQueryClient();
   const location = useLocation();
-  // The project selector scopes the team-projects dashboards; hide it on Keytia.
-  const showProjectSelector = !location.pathname.startsWith('/keytia');
+  // The project selector scopes the team-projects dashboards; hide it on Keytia
+  // and on "Todos los proyectos" (that dashboard is always org-wide).
+  const showProjectSelector =
+    !location.pathname.startsWith('/keytia') &&
+    !location.pathname.startsWith('/all-projects');
 
   return (
     <nav className="navbar navbar-expand navbar-light navbar-bg">

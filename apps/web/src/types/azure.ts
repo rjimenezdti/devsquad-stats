@@ -22,6 +22,10 @@ export interface WorkItemSummary {
   assignedTo: string;
   iterationPath: string;
   storyPoints: number | null;
+  /** "Impacto estimado" — Custom.EstimatedEfforthrs (estimated effort, hrs). */
+  estimatedImpact: number | null;
+  /** "Work type" — Custom.Type (Nuevo | Cambio (cliente) | Ajuste (dti)). */
+  workType: string;
   tags: string[];
 }
 

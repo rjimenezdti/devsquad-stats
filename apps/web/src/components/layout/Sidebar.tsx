@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Sliders, Layers, Users, TrendingUp, type Icon } from 'react-feather';
+import { Sliders, Grid, Users, type Icon } from 'react-feather';
 
 interface NavItem {
   to: string;
@@ -16,9 +16,8 @@ const SECTIONS: NavSection[] = [
   {
     header: 'Proyectos del equipo',
     items: [
-      { to: '/', label: 'Resumen', icon: Sliders },
-      { to: '/work-items', label: 'Work Items', icon: Layers },
-      { to: '/velocity', label: 'Velocity', icon: TrendingUp },
+      { to: '/all-projects', label: 'Todos los proyectos', icon: Grid },
+      { to: '/', label: 'Resumen por proyecto', icon: Sliders },
     ],
   },
   {

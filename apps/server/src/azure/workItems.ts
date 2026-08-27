@@ -26,6 +26,8 @@ const DEFAULT_FIELDS = [
   'System.IterationPath',
   'System.Tags',
   'Microsoft.VSTS.Scheduling.StoryPoints',
+  'Custom.EstimatedEfforthrs',
+  'Custom.Type',
 ];
 
 /** WIQL only returns ids; batch has a hard limit of 200 ids per request. */
@@ -67,6 +69,7 @@ function displayNameOf(assignedTo: unknown): string {
 function toSummary(item: WorkItem): WorkItemSummary {
   const f = item.fields;
   const points = f['Microsoft.VSTS.Scheduling.StoryPoints'];
+  const impact = f['Custom.EstimatedEfforthrs'];
   const tags = (f['System.Tags'] as string | undefined)?.split(';').map((t) => t.trim());
 
   return {
@@ -78,6 +81,8 @@ function toSummary(item: WorkItem): WorkItemSummary {
     assignedTo: displayNameOf(f['System.AssignedTo']),
     iterationPath: (f['System.IterationPath'] as string) ?? '',
     storyPoints: typeof points === 'number' ? points : null,
+    estimatedImpact: typeof impact === 'number' ? impact : null,
+    workType: (f['Custom.Type'] as string | undefined) ?? 'Sin clasificar',
     tags: tags?.filter(Boolean) ?? [],
   };
 }
