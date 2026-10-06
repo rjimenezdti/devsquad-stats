@@ -24,37 +24,99 @@ const COMPLETED_STATES = new Set(
 /** Concurrency when fanning out velocity computation across projects. */
 const PROJECT_CONCURRENCY = 5;
 
-interface RawIteration {
-  id: string;
+/**
+ * Only iterations whose name is a "yyyyMMdd-yyyyMMdd" date range (sprint
+ * start-end) are surfaced; anything else in the tree is ignored.
+ */
+const SPRINT_NAME_PATTERN = /^\d{8}-\d{8}$/;
+
+/** A node in the project's iteration classification tree. */
+interface RawIterationNode {
+  id: number;
+  identifier: string;
   name: string;
-  path: string;
   attributes?: {
-    startDate: string | null;
-    finishDate: string | null;
-    timeFrame: string;
+    startDate?: string | null;
+    finishDate?: string | null;
   };
+  hasChildren?: boolean;
+  children?: RawIterationNode[];
 }
 
+/**
+ * Classification nodes expose start/finish dates but not Azure's "timeFrame"
+ * (past/current/future), which the velocity logic relies on, so we derive it
+ * from the dates. Undated iterations are "unknown" — treated as started, so
+ * `recentStartedSprints` never filters them out as future.
+ */
+function deriveTimeFrame(
+  startDate: string | null,
+  finishDate: string | null,
+): Iteration['timeFrame'] {
+  const now = Date.now();
+  const start = startDate ? new Date(startDate).getTime() : null;
+  const finish = finishDate ? new Date(finishDate).getTime() : null;
+  if (start === null && finish === null) return 'unknown';
+  if (start !== null && now < start) return 'future';
+  if (finish !== null && now > finish) return 'past';
+  return 'current';
+}
+
+/**
+ * Flattens the iteration tree into its leaf sprints. The `path` is rebuilt from
+ * the node names (rooted at the project name) so it matches `System.IterationPath`
+ * used by WIQL — the raw node `path` has a different shape (`\Project\Iteration\…`).
+ * The depth-0 project root is never a selectable sprint; container nodes (e.g. a
+ * "Release 1" holding sprints) are skipped so velocity never double-counts a
+ * parent's `UNDER` query against its children.
+ */
+function collectLeafIterations(
+  node: RawIterationNode,
+  parentPath: string,
+  depth: number,
+  out: Iteration[],
+): void {
+  const path = depth === 0 ? node.name : `${parentPath}\\${node.name}`;
+  const children = node.children ?? [];
+
+  if (depth > 0 && children.length === 0) {
+    const startDate = node.attributes?.startDate ?? null;
+    const finishDate = node.attributes?.finishDate ?? null;
+    out.push({
+      id: node.identifier ?? String(node.id),
+      name: node.name,
+      path,
+      startDate,
+      finishDate,
+      timeFrame: deriveTimeFrame(startDate, finishDate),
+    });
+  }
+
+  for (const child of children) {
+    collectLeafIterations(child, path, depth + 1, out);
+  }
+}
+
+/**
+ * Sprints for a project, read from the project's iteration tree (Project
+ * Settings → iterations / classification nodes) rather than a team's selected
+ * backlog iterations. Returns the leaf iterations across the whole tree.
+ */
 export async function getIterations(
   clients: AzureClients,
   source: AzureSourceConfig,
   project: string,
-  team = defaultTeamFor(project),
 ): Promise<Iteration[]> {
-  const { data } = await clients.core.get<{ value: RawIteration[] }>(
-    `/${encodeURIComponent(project)}/${encodeURIComponent(team)}` +
-      `/_apis/work/teamsettings/iterations`,
-    { params: { 'api-version': source.apiVersion } },
+  const { data } = await clients.core.get<RawIterationNode>(
+    `/${encodeURIComponent(project)}/_apis/wit/classificationnodes/iterations`,
+    { params: { 'api-version': source.apiVersion, $depth: 10 } },
   );
 
-  return (data.value ?? []).map((it) => ({
-    id: it.id,
-    name: it.name,
-    path: it.path,
-    startDate: it.attributes?.startDate ?? null,
-    finishDate: it.attributes?.finishDate ?? null,
-    timeFrame: it.attributes?.timeFrame ?? 'unknown',
-  }));
+  const iterations: Iteration[] = [];
+  collectLeafIterations(data, '', 0, iterations);
+  return iterations
+    .filter((it) => SPRINT_NAME_PATTERN.test(it.name))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 }
 
 function summarizeSprint(
@@ -105,7 +167,7 @@ export async function getVelocityReport(
   const team = options.team ?? defaultTeamFor(project);
   const count = options.count ?? 6;
 
-  const iterations = await getIterations(clients, source, project, team);
+  const iterations = await getIterations(clients, source, project);
   const relevant = recentStartedSprints(iterations, count);
 
   const sprints: SprintVelocity[] = [];
@@ -140,7 +202,7 @@ export async function getVelocityOverview(
     async (project): Promise<ProjectVelocity | null> => {
       const team = defaultTeamFor(project.name);
       try {
-        const iterations = await getIterations(clients, source, project.name, team);
+        const iterations = await getIterations(clients, source, project.name);
         const relevant = recentStartedSprints(iterations, count);
         if (relevant.length === 0) {
           skipped.push(project.name);

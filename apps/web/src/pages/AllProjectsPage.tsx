@@ -1,13 +1,11 @@
-import { useMemo, useState } from 'react';
-import { Filter, X } from 'react-feather';
-import { useIterations, useMeta, useProjects, useWorkItems } from '@/features/azure/hooks';
+import { useMemo } from 'react';
+import { useProjects, useWorkItems } from '@/features/azure/hooks';
 import { SOURCE } from '@/features/azure/api';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { LoadingState, ErrorState } from '@/components/ui/states';
 import { OverviewContent, DONE_STATES } from '@/pages/OverviewPage';
 import { toErrorMessage } from '@/lib/apiClient';
 import { palette } from '@/lib/theme';
-import { shortIteration } from '@/lib/format';
 import type { WorkItemSummary } from '@/types/azure';
 
 /** Tipos considerados para el avance por proyecto (incluye User Story además de PBI/Bug). */
@@ -135,25 +133,8 @@ function ProjectProgressTable({
 /**
  * "Todos los proyectos": los mismos reportes que el Resumen pero SIEMPRE
  * consolidados sobre toda la organización (ignora el proyecto del navbar).
- *
- * Todos los proyectos comparten los mismos nombres de sprint, pero el
- * `iterationPath` es específico por proyecto (p. ej. "Proyecto\\Sprint 12"), así
- * que el filtro de sprint se aplica por NOMBRE de sprint del lado del cliente
- * para que abarque todos los proyectos a la vez.
  */
 export function AllProjectsPage() {
-  // Los sprints salen del proyecto por defecto; comparten nombre entre proyectos.
-  const meta = useMeta(SOURCE.devprojects);
-  const iterations = useIterations(SOURCE.devprojects, meta.data?.defaultProject || '');
-
-  const [selectedSprint, setSelectedSprint] = useState('');
-
-  const sprintOptions = useMemo(() => {
-    const names = new Set<string>();
-    for (const it of iterations.data ?? []) names.add(it.name);
-    return [...names].sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-  }, [iterations.data]);
-
   // Consolidado org-wide (sin filtro de iteración en el backend).
   const workItems = useWorkItems(SOURCE.devprojects, { project: '' });
   // Todos los proyectos de la org (para listarlos aunque no tengan elementos).
@@ -167,66 +148,20 @@ export function AllProjectsPage() {
   const isLoading = workItems.isLoading || projects.isLoading;
   const isError = workItems.isError || projects.isError;
 
-  // El filtro por sprint se aplica por nombre para abarcar todos los proyectos.
-  const filteredItems = useMemo(() => {
-    const all = workItems.data?.items ?? [];
-    if (!selectedSprint) return all;
-    return all.filter((i) => shortIteration(i.iterationPath) === selectedSprint);
-  }, [workItems.data, selectedSprint]);
-
   return (
     <>
       <PageHeader title="Todos los proyectos" highlight="· Consolidado de la organización" />
-
-      <div className="card filter-bar mb-3">
-        <div className="card-body py-3">
-          <div className="d-flex flex-wrap align-items-end gap-3">
-            <div className="filter-field">
-              <label htmlFor="sprint-filter" className="filter-label">
-                <Filter size={12} className="me-1" />
-                Sprint
-              </label>
-              <select
-                id="sprint-filter"
-                className="form-select form-select-sm"
-                style={{ minWidth: 220 }}
-                value={selectedSprint}
-                onChange={(e) => setSelectedSprint(e.target.value)}
-                disabled={sprintOptions.length === 0}
-              >
-                <option value="">Todos los sprints</option>
-                {sprintOptions.map((name) => (
-                  <option key={name} value={name}>
-                    {shortIteration(name)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {selectedSprint && (
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-secondary"
-                onClick={() => setSelectedSprint('')}
-              >
-                <X size={14} className="me-1" />
-                Limpiar
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
 
       {isLoading && <LoadingState />}
       {isError && <ErrorState message={toErrorMessage(workItems.error ?? projects.error)} />}
 
       {!isLoading && !isError && workItems.data && (
         <OverviewContent
-          wi={{ ...workItems.data, items: filteredItems }}
+          wi={workItems.data}
           afterKpis={
             <div className="row">
               <div className="col-12 d-flex">
-                <ProjectProgressTable items={filteredItems} projects={projectNames} />
+                <ProjectProgressTable items={workItems.data.items} projects={projectNames} />
               </div>
             </div>
           }

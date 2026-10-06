@@ -126,7 +126,7 @@ export function createApiRouter(registry: SourceRegistry, config: AppConfig): Ro
         });
         return;
       }
-      res.json(await getIterations(rt.clients, rt.source, project, queryString(req.query.team)));
+      res.json(await getIterations(rt.clients, rt.source, project));
     }),
   );
 
