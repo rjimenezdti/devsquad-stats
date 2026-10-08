@@ -56,6 +56,13 @@ function countBuckets(items: WorkItemSummary[], key: (i: WorkItemSummary) => str
 const isBlocked = (i: WorkItemSummary) =>
   i.tags.some((t) => t.toLowerCase() === BLOCKED_TAG);
 
+/** Valores únicos (sin vacíos) ordenados en español, para poblar los filtros DDL. */
+function uniqueSorted(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, 'es', { numeric: true }),
+  );
+}
+
 type SortDir = 'asc' | 'desc';
 
 interface SprintColumn {
@@ -77,8 +84,8 @@ const SPRINT_COLUMNS: SprintColumn[] = [
     get: (i) => shortIteration(i.iterationPath),
     render: (i) => shortIteration(i.iterationPath),
   },
-  { key: 'title', label: 'Title', get: (i) => i.title, render: (i) => i.title },
-  { key: 'state', label: 'State', get: (i) => i.state, render: (i) => <StateBadge state={i.state} /> },
+  { key: 'title', label: 'Título', get: (i) => i.title, render: (i) => i.title },
+  { key: 'state', label: 'Estado', get: (i) => i.state, render: (i) => <StateBadge state={i.state} /> },
   {
     key: 'blocked',
     label: 'Bloqueado',
@@ -88,7 +95,7 @@ const SPRINT_COLUMNS: SprintColumn[] = [
   },
   {
     key: 'type',
-    label: 'Work type',
+    label: 'Tipo de trabajo',
     headClass: 'd-none d-md-table-cell',
     cellClass: 'd-none d-md-table-cell',
     get: (i) => i.type,
@@ -104,7 +111,7 @@ const SPRINT_COLUMNS: SprintColumn[] = [
   },
   {
     key: 'assignee',
-    label: 'Assigned to',
+    label: 'Asignado a',
     headClass: 'd-none d-lg-table-cell',
     cellClass: 'd-none d-lg-table-cell',
     get: (i) => i.assignedTo,
@@ -218,8 +225,17 @@ export function OverviewPage() {
   const iterations = useIterations(SOURCE.devprojects, iterationsProject);
 
   const [selectedSprint, setSelectedSprint] = useState('');
-  // The iteration paths differ per project, so reset the filter when it changes.
-  useEffect(() => setSelectedSprint(''), [iterationsProject]);
+  const [stateFilter, setStateFilter] = useState('');
+  const [blockedFilter, setBlockedFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  // Las rutas de iteración (y los valores disponibles) cambian por proyecto, así
+  // que al cambiar de proyecto se reinician todos los filtros.
+  useEffect(() => {
+    setSelectedSprint('');
+    setStateFilter('');
+    setBlockedFilter('');
+    setTypeFilter('');
+  }, [iterationsProject]);
 
   const sprintOptions = useMemo(
     () =>
@@ -235,6 +251,37 @@ export function OverviewPage() {
   });
   const overview = useVelocityOverview(SOURCE.devprojects, undefined, allProjects); // all-projects only
 
+  // Base de los filtros/opciones: solo los tipos que el resumen considera.
+  const baseItems = useMemo(
+    () =>
+      (workItems.data?.items ?? []).filter((i) => TABLE_TYPES.includes(i.type.toLowerCase())),
+    [workItems.data],
+  );
+  const stateOptions = useMemo(() => uniqueSorted(baseItems.map((i) => i.state)), [baseItems]);
+  const typeOptions = useMemo(() => uniqueSorted(baseItems.map((i) => i.type)), [baseItems]);
+
+  // Estado/Bloqueado/Tipo se aplican en el cliente sobre los datos ya traídos
+  // (el Sprint se aplica en el backend vía iterationPath).
+  const filteredItems = useMemo(
+    () =>
+      baseItems.filter((i) => {
+        if (stateFilter && i.state !== stateFilter) return false;
+        if (typeFilter && i.type !== typeFilter) return false;
+        if (blockedFilter === 'blocked' && !isBlocked(i)) return false;
+        if (blockedFilter === 'unblocked' && isBlocked(i)) return false;
+        return true;
+      }),
+    [baseItems, stateFilter, typeFilter, blockedFilter],
+  );
+
+  const anyFilter = Boolean(selectedSprint || stateFilter || blockedFilter || typeFilter);
+  const clearFilters = () => {
+    setSelectedSprint('');
+    setStateFilter('');
+    setBlockedFilter('');
+    setTypeFilter('');
+  };
+
   const isLoading = workItems.isLoading || (allProjects && overview.isLoading);
   const isError = workItems.isError || (allProjects && overview.isError);
 
@@ -249,6 +296,28 @@ export function OverviewPage() {
         <div className="card-body py-3">
           <div className="d-flex flex-wrap align-items-end gap-3">
             <div className="filter-field">
+              <label htmlFor="state-filter" className="filter-label">
+                <Filter size={12} className="me-1" />
+                Estado
+              </label>
+              <select
+                id="state-filter"
+                className="form-select form-select-sm"
+                style={{ minWidth: 180 }}
+                value={stateFilter}
+                onChange={(e) => setStateFilter(e.target.value)}
+                disabled={stateOptions.length === 0}
+              >
+                <option value="">Todos los estados</option>
+                {stateOptions.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-field">
               <label htmlFor="sprint-filter" className="filter-label">
                 <Filter size={12} className="me-1" />
                 Sprint
@@ -256,7 +325,7 @@ export function OverviewPage() {
               <select
                 id="sprint-filter"
                 className="form-select form-select-sm"
-                style={{ minWidth: 220 }}
+                style={{ minWidth: 180 }}
                 value={selectedSprint}
                 onChange={(e) => setSelectedSprint(e.target.value)}
                 disabled={sprintOptions.length === 0}
@@ -270,11 +339,51 @@ export function OverviewPage() {
               </select>
             </div>
 
-            {selectedSprint && (
+            <div className="filter-field">
+              <label htmlFor="blocked-filter" className="filter-label">
+                <Filter size={12} className="me-1" />
+                Bloqueado
+              </label>
+              <select
+                id="blocked-filter"
+                className="form-select form-select-sm"
+                style={{ minWidth: 150 }}
+                value={blockedFilter}
+                onChange={(e) => setBlockedFilter(e.target.value)}
+              >
+                <option value="">Todos</option>
+                <option value="blocked">Sí</option>
+                <option value="unblocked">No</option>
+              </select>
+            </div>
+
+            <div className="filter-field">
+              <label htmlFor="type-filter" className="filter-label">
+                <Filter size={12} className="me-1" />
+                Tipo de trabajo
+              </label>
+              <select
+                id="type-filter"
+                className="form-select form-select-sm"
+                style={{ minWidth: 180 }}
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                disabled={typeOptions.length === 0}
+              >
+                <option value="">Todos los tipos</option>
+                {typeOptions.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {anyFilter && (
               <button
                 type="button"
                 className="btn btn-sm btn-outline-secondary"
-                onClick={() => setSelectedSprint('')}
+                onClick={clearFilters}
               >
                 <X size={14} className="me-1" />
                 Limpiar
@@ -289,7 +398,7 @@ export function OverviewPage() {
 
       {!isLoading && !isError && workItems.data && (
         <OverviewContent
-          wi={workItems.data}
+          wi={{ ...workItems.data, items: filteredItems }}
           velocity={allProjects ? overview.data : undefined}
           showSprintTable
         />
@@ -389,7 +498,7 @@ export function OverviewContent({
           </ChartCard>
         </div>
         <div className="col-12 col-lg-6 d-flex">
-          <ChartCard title="Work items por Work Type">
+          <ChartCard title="Work items por tipo de trabajo">
             <DonutChart
               labels={workTypeLabels}
               series={workTypeSeries}
