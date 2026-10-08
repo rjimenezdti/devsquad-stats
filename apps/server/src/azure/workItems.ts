@@ -1,4 +1,4 @@
-import type { AzureSourceConfig } from '../config.js';
+import { isProjectExcluded, type AzureSourceConfig } from '../config.js';
 import type { AzureClients } from './client.js';
 import type {
   CountBucket,
@@ -172,7 +172,10 @@ export async function getWorkItemsReport(
   if (ids.length === 0) return emptyReport();
 
   const details = await fetchDetails(clients, source, ids);
-  const items = details.map(toSummary);
+  // Drop items from excluded projects (relevant for org-wide queries, which span
+  // every project the PAT can see).
+  const items = details.map(toSummary).filter((i) => !isProjectExcluded(source, i.project));
+  if (items.length === 0) return emptyReport();
 
   return {
     total: items.length,

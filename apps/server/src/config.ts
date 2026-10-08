@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 
 loadEnv();
@@ -66,6 +68,11 @@ export interface AzureSourceConfig {
   defaultProject: string;
   /** How the "user stories by client" report is scoped for this source. */
   userStories: UserStoriesConfig;
+  /**
+   * Project names excluded from every report (project selector, Overview, Work
+   * Items and Velocity). Matched case- and trim-insensitively by name.
+   */
+  excludedProjects: string[];
 }
 
 const DEFAULT_BACKLOG_TYPES = ['User Story', 'Product Backlog Item', 'Issue', 'Requirement'];
@@ -92,6 +99,36 @@ export function defaultTeamFor(project: string): string {
   return `${project} Team`;
 }
 
+/** Normaliza un nombre de proyecto para comparar sin distinción de mayúsculas ni espacios. */
+function normalizeProjectName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+/**
+ * Lee la lista de proyectos excluidos desde `excluded-projects.json` (en la raíz
+ * de apps/server). Si el archivo no existe o es inválido, no se excluye ninguno
+ * (nunca rompe el arranque).
+ */
+function loadExcludedProjects(): string[] {
+  const path = fileURLToPath(new URL('../excluded-projects.json', import.meta.url));
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as { projects?: unknown };
+    const list = Array.isArray(parsed.projects) ? parsed.projects : [];
+    return list.filter((p): p is string => typeof p === 'string' && p.trim() !== '');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    console.warn(`No se pudo leer excluded-projects.json: ${(err as Error).message}`);
+    return [];
+  }
+}
+
+/** True si el proyecto está en la lista de exclusión de la fuente. */
+export function isProjectExcluded(source: AzureSourceConfig, projectName: string): boolean {
+  if (source.excludedProjects.length === 0) return false;
+  const target = normalizeProjectName(projectName);
+  return source.excludedProjects.some((p) => normalizeProjectName(p) === target);
+}
+
 function buildSource(params: {
   id: string;
   label: string;
@@ -100,6 +137,7 @@ function buildSource(params: {
   apiVersion: string;
   defaultProject?: string;
   userStories?: Partial<UserStoriesConfig>;
+  excludedProjects?: string[];
 }): AzureSourceConfig {
   return {
     id: params.id,
@@ -108,6 +146,7 @@ function buildSource(params: {
     pat: params.pat,
     apiVersion: params.apiVersion,
     defaultProject: params.defaultProject ?? '',
+    excludedProjects: params.excludedProjects ?? [],
     baseUrl: `https://dev.azure.com/${encodeURIComponent(params.org)}`,
     analyticsUrl: `https://analytics.dev.azure.com/${encodeURIComponent(params.org)}`,
     userStories: {
@@ -132,6 +171,7 @@ function buildSource(params: {
  */
 export function loadConfig(): AppConfig {
   const apiVersion = optional('AZDO_API_VERSION', '7.1');
+  const excludedProjects = loadExcludedProjects();
   const sources: Record<string, AzureSourceConfig> = {};
 
   // Primary source: the team's projects.
@@ -142,6 +182,7 @@ export function loadConfig(): AppConfig {
     pat: required('AZDO_PAT'),
     apiVersion,
     defaultProject: optional('AZDO_PROJECT', ''),
+    excludedProjects,
   });
 
   // Optional source: the Keytia ticketing organization. Scoped to a single

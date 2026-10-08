@@ -1,0 +1,4 @@
+{
+  "_comment": "Proyectos de Azure DevOps a excluir de TODOS los reportes (selector de proyecto, Resumen, Work Items y Velocity). Escribe el nombre EXACTO como aparece en Azure DevOps. La comparacion ignora mayusculas/minusculas y espacios al inicio/fin. Ejemplo: \"KOF - Carga masiva de lineas moviles\".",
+  "projects": ["Cemex - Asignación de equipos","Cemex - Generación de Órdenes de Compra","Evox - Reportes SLA","Farmacias - Automatizacion carga de facturas","KOF - Gestión de dispositivos móviles","La Comer - Proyección presupuesto anual","Pentafon - Keytia"]
+}
