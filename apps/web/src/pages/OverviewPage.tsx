@@ -22,8 +22,12 @@ import type { VelocityOverview, WorkItemSummary, WorkItemsReport } from '@/types
 
 export const DONE_STATES = ['done', 'closed', 'completed', 'resolved'];
 const BLOCKED_TAG = 'bloqueado';
-/** Tipos de work item que consideran los reportes del resumen. */
-export const TABLE_TYPES = ['product backlog item', 'bug'];
+/**
+ * Tipos de work item que consideran los reportes del resumen. Incluye el backlog
+ * de ambas plantillas de proceso: "Product Backlog Item" (Scrum) y "User Story"
+ * (Agile), más "Bug".
+ */
+export const TABLE_TYPES = ['product backlog item', 'user story', 'bug'];
 const BUG_ROW_BG = '#F8D7DA';
 
 /** Paleta de colores compartida con el dashboard de Keytia (misma secuencia). */

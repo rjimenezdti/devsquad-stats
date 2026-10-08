@@ -1,4 +1,4 @@
-import type { AzureSourceConfig } from '../config.js';
+import { isProjectExcluded, type AzureSourceConfig } from '../config.js';
 import type { AzureClients } from './client.js';
 import type { Project } from '../types/azure.js';
 
@@ -20,6 +20,7 @@ export async function getProjects(
   });
 
   return (data.value ?? [])
+    .filter((p) => !isProjectExcluded(source, p.name))
     .map((p) => ({
       id: p.id,
       name: p.name,
