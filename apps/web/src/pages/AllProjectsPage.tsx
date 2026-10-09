@@ -158,6 +158,7 @@ export function AllProjectsPage() {
       {!isLoading && !isError && workItems.data && (
         <OverviewContent
           wi={workItems.data}
+          showBugsKpi
           afterKpis={
             <div className="row">
               <div className="col-12 d-flex">
