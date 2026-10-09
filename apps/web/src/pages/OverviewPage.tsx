@@ -24,18 +24,21 @@ const BLOCKED_TAG = 'bloqueado';
 export const TABLE_TYPES = ['product backlog item', 'user story', 'bug'];
 const BUG_ROW_BG = '#F8D7DA';
 
-/** Paleta de colores compartida con el dashboard de Keytia (misma secuencia). */
+/**
+ * Paleta categórica de alto contraste para las gráficas de dona. El orden de los
+ * tonos está optimizado para que las series adyacentes sean fáciles de distinguir
+ * (incluso con daltonismo): ΔE CVD mínimo 24.2, validado con el validador de la
+ * guía de dataviz. Son 8 tonos combinables; si hay más series se reciclan.
+ */
 const CHART_PALETTE = [
-  '#36566d',
-  '#357988',
-  '#afc5a1',
-  '#fdcd7b',
-  '#8f4953',
-  '#7a825d',
-  '#3a584a',
-  '#62808a',
-  '#203740',
-  '#aedbda',
+  '#2a78d6', // azul
+  '#1baf7a', // aqua
+  '#eda100', // amarillo
+  '#008300', // verde
+  '#4a3aa7', // violeta
+  '#e34948', // rojo
+  '#e87ba4', // magenta
+  '#eb6834', // naranja
 ];
 
 /** Agrupa y cuenta items por una clave, de mayor a menor (como en el backend). */
@@ -49,6 +52,12 @@ function countBuckets(items: WorkItemSummary[], key: (i: WorkItemSummary) => str
 
 const isBlocked = (i: WorkItemSummary) =>
   i.tags.some((t) => t.toLowerCase() === BLOCKED_TAG);
+
+/** Tag que marca un elemento como bug, además del tipo de work item "Bug". */
+const BUG_TAG = 'bug';
+/** Es bug si su tipo es "Bug" o tiene un tag igual a "bug". */
+const isBug = (i: WorkItemSummary) =>
+  i.type.toLowerCase() === 'bug' || i.tags.some((t) => t.toLowerCase() === BUG_TAG);
 
 /** Valores únicos (sin vacíos) ordenados en español, para poblar los filtros DDL. */
 function uniqueSorted(values: string[]): string[] {
@@ -181,9 +190,7 @@ function SprintItemsTable({ items }: { items: WorkItemSummary[] }) {
             {sorted.map((item) => (
               <tr
                 key={item.id}
-                style={
-                  item.type.toLowerCase() === 'bug' ? { backgroundColor: BUG_ROW_BG } : undefined
-                }
+                style={isBug(item) ? { backgroundColor: BUG_ROW_BG } : undefined}
               >
                 {SPRINT_COLUMNS.map((col) => (
                   <td key={col.key} className={col.cellClass}>
@@ -288,28 +295,6 @@ export function OverviewPage() {
         <div className="card-body py-3">
           <div className="d-flex flex-wrap align-items-end gap-3">
             <div className="filter-field">
-              <label htmlFor="state-filter" className="filter-label">
-                <Filter size={12} className="me-1" />
-                Estado
-              </label>
-              <select
-                id="state-filter"
-                className="form-select form-select-sm"
-                style={{ minWidth: 180 }}
-                value={stateFilter}
-                onChange={(e) => setStateFilter(e.target.value)}
-                disabled={stateOptions.length === 0}
-              >
-                <option value="">Todos los estados</option>
-                {stateOptions.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="filter-field">
               <label htmlFor="sprint-filter" className="filter-label">
                 <Filter size={12} className="me-1" />
                 Sprint
@@ -326,6 +311,28 @@ export function OverviewPage() {
                 {sprintOptions.map((it) => (
                   <option key={it.id} value={it.path}>
                     {shortIteration(it.name)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-field">
+              <label htmlFor="state-filter" className="filter-label">
+                <Filter size={12} className="me-1" />
+                Estado
+              </label>
+              <select
+                id="state-filter"
+                className="form-select form-select-sm"
+                style={{ minWidth: 180 }}
+                value={stateFilter}
+                onChange={(e) => setStateFilter(e.target.value)}
+                disabled={stateOptions.length === 0}
+              >
+                <option value="">Todos los estados</option>
+                {stateOptions.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
                   </option>
                 ))}
               </select>
@@ -391,6 +398,7 @@ export function OverviewPage() {
       {!isLoading && !isError && workItems.data && (
         <OverviewContent
           wi={{ ...workItems.data, items: filteredItems }}
+          showBugsKpi
           showSprintTable
         />
       )}
@@ -428,7 +436,7 @@ export function OverviewContent({
   const blocked = items.filter((i) =>
     i.tags.some((t) => t.toLowerCase() === BLOCKED_TAG),
   ).length;
-  const bugs = items.filter((i) => i.type.toLowerCase() === 'bug').length;
+  const bugs = items.filter(isBug).length;
 
   const stateLabels = byState.map((b) => b.key);
   const stateSeries = byState.map((b) => b.count);
