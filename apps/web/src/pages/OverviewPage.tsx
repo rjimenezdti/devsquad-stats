@@ -1,11 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Layers, CheckCircle, Clock, Slash, Filter, X } from 'react-feather';
-import {
-  useIterations,
-  useMeta,
-  useVelocityOverview,
-  useWorkItems,
-} from '@/features/azure/hooks';
+import { Layers, CheckCircle, Clock, Slash, Filter, X, AlertOctagon } from 'react-feather';
+import { useIterations, useMeta, useWorkItems } from '@/features/azure/hooks';
 import { SOURCE } from '@/features/azure/api';
 import { useSelectedProject } from '@/features/project/ProjectContext';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -14,11 +9,10 @@ import { ChartCard } from '@/components/ui/ChartCard';
 import { StateBadge } from '@/components/ui/StateBadge';
 import { LoadingState, ErrorState } from '@/components/ui/states';
 import { DonutChart } from '@/components/charts/DonutChart';
-import { ColumnChart } from '@/components/charts/ColumnChart';
 import { toErrorMessage } from '@/lib/apiClient';
 import { palette } from '@/lib/theme';
 import { formatNumber, formatPercent, shortIteration } from '@/lib/format';
-import type { VelocityOverview, WorkItemSummary, WorkItemsReport } from '@/types/azure';
+import type { WorkItemSummary, WorkItemsReport } from '@/types/azure';
 
 export const DONE_STATES = ['done', 'closed', 'completed', 'resolved'];
 const BLOCKED_TAG = 'bloqueado';
@@ -216,7 +210,6 @@ function SprintItemsTable({ items }: { items: WorkItemSummary[] }) {
 
 export function OverviewPage() {
   const { selectedProject } = useSelectedProject();
-  const allProjects = !selectedProject;
 
   // Iterations are project-scoped; fall back to the source's default project
   // when the dashboard is showing the whole organization.
@@ -249,7 +242,6 @@ export function OverviewPage() {
     project: selectedProject,
     iterationPath: selectedSprint || undefined,
   });
-  const overview = useVelocityOverview(SOURCE.devprojects, undefined, allProjects); // all-projects only
 
   // Base de los filtros/opciones: solo los tipos que el resumen considera.
   const baseItems = useMemo(
@@ -282,8 +274,8 @@ export function OverviewPage() {
     setTypeFilter('');
   };
 
-  const isLoading = workItems.isLoading || (allProjects && overview.isLoading);
-  const isError = workItems.isError || (allProjects && overview.isError);
+  const isLoading = workItems.isLoading;
+  const isError = workItems.isError;
 
   return (
     <>
@@ -394,12 +386,11 @@ export function OverviewPage() {
       </div>
 
       {isLoading && <LoadingState />}
-      {isError && <ErrorState message={toErrorMessage(workItems.error ?? overview.error)} />}
+      {isError && <ErrorState message={toErrorMessage(workItems.error)} />}
 
       {!isLoading && !isError && workItems.data && (
         <OverviewContent
           wi={{ ...workItems.data, items: filteredItems }}
-          velocity={allProjects ? overview.data : undefined}
           showSprintTable
         />
       )}
@@ -410,16 +401,19 @@ export function OverviewPage() {
 export function OverviewContent({
   wi,
   afterKpis,
-  velocity,
   showSprintTable,
+  showBugsKpi,
 }: {
   wi: WorkItemsReport;
   /** Contenido opcional que se inserta entre los KPIs y las gráficas. */
   afterKpis?: ReactNode;
-  /** Si se provee, muestra el reporte "Velocity por proyecto". */
-  velocity?: VelocityOverview;
   /** Muestra la tabla "Elementos del sprint". */
   showSprintTable?: boolean;
+  /**
+   * Agrega un KPI con la cantidad de Bugs (en rojo) y muestra "Bloqueados" en
+   * morado. Usado en la página "Todos los proyectos".
+   */
+  showBugsKpi?: boolean;
 }) {
   // Todos los reportes del resumen solo consideran los tipos permitidos
   // (Product Backlog Item y Bug).
@@ -434,6 +428,7 @@ export function OverviewContent({
   const blocked = items.filter((i) =>
     i.tags.some((t) => t.toLowerCase() === BLOCKED_TAG),
   ).length;
+  const bugs = items.filter((i) => i.type.toLowerCase() === 'bug').length;
 
   const stateLabels = byState.map((b) => b.key);
   const stateSeries = byState.map((b) => b.count);
@@ -443,8 +438,6 @@ export function OverviewContent({
   const workTypeLabels = byWorkType.map((b) => b.key);
   const workTypeSeries = byWorkType.map((b) => b.count);
   const workTypeColors = byWorkType.map((_, i) => CHART_PALETTE[i % CHART_PALETTE.length]);
-
-  const topProjects = velocity?.projects.slice(0, 12) ?? [];
 
   return (
     <>
@@ -479,9 +472,19 @@ export function OverviewContent({
             label="Bloqueados"
             value={formatNumber(blocked)}
             icon={Slash}
-            accent={palette.danger}
+            accent={showBugsKpi ? palette.purple : palette.danger}
           />
         </div>
+        {showBugsKpi && (
+          <div className="col d-flex">
+            <KpiCard
+              label="Bugs"
+              value={formatNumber(bugs)}
+              icon={AlertOctagon}
+              accent={palette.danger}
+            />
+          </div>
+        )}
       </div>
 
       {afterKpis}
@@ -508,29 +511,6 @@ export function OverviewContent({
           </ChartCard>
         </div>
       </div>
-
-      {velocity && (
-        <div className="row">
-          <div className="col-12 d-flex">
-            <ChartCard
-              title="Velocity por proyecto"
-              subtitle="Promedio de story points por sprint"
-            >
-              {topProjects.length > 0 ? (
-                <ColumnChart
-                  categories={topProjects.map((p) => p.project)}
-                  series={[{ name: 'Velocity promedio', data: topProjects.map((p) => p.averageVelocity) }]}
-                  colors={[CHART_PALETTE[0]]}
-                  horizontal
-                  height={Math.max(260, topProjects.length * 30)}
-                />
-              ) : (
-                <div className="state-center">Sin datos de velocity</div>
-              )}
-            </ChartCard>
-          </div>
-        </div>
-      )}
 
       {showSprintTable && (
         <div className="row">
