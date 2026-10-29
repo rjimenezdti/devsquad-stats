@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { Sliders, Grid, Users, type Icon } from 'react-feather';
+import logoDti from '@/assets/logo_dti.png';
 
 interface NavItem {
   to: string;
@@ -34,8 +35,14 @@ export function Sidebar({ collapsed }: SidebarProps) {
   return (
     <nav id="sidebar" className={`sidebar js-sidebar${collapsed ? ' collapsed' : ''}`}>
       <div className="sidebar-content">
-        <NavLink className="sidebar-brand" to="/">
-          <span className="align-middle">DevSquad Stats</span>
+        <NavLink className="sidebar-brand d-flex flex-column align-items-start" to="/">
+          <img
+            src={logoDti}
+            alt="dti"
+            className="sidebar-brand-logo mb-2"
+            style={{ height: 40, width: 'auto' }}
+          />
+          <span className="align-middle">Estadísticas Desarrollo</span>
         </NavLink>
 
         <ul className="sidebar-nav">

@@ -25,20 +25,19 @@ export const TABLE_TYPES = ['product backlog item', 'user story', 'bug'];
 const BUG_ROW_BG = '#F8D7DA';
 
 /**
- * Paleta categórica de alto contraste para las gráficas de dona. El orden de los
- * tonos está optimizado para que las series adyacentes sean fáciles de distinguir
- * (incluso con daltonismo): ΔE CVD mínimo 24.2, validado con el validador de la
- * guía de dataviz. Son 8 tonos combinables; si hay más series se reciclan.
+ * Paleta categórica corporativa para las gráficas de dona: tonos sobrios y
+ * fáciles de distinguir entre series (incluso con daltonismo). Validada con el
+ * validador de dataviz: saturación OK, contraste ≥3:1 sobre fondo claro y
+ * separación CVD ΔE mínima 22.4. Son 7 tonos; si hay más series se reciclan.
  */
 const CHART_PALETTE = [
-  '#2a78d6', // azul
-  '#1baf7a', // aqua
-  '#eda100', // amarillo
-  '#008300', // verde
-  '#4a3aa7', // violeta
-  '#e34948', // rojo
-  '#e87ba4', // magenta
-  '#eb6834', // naranja
+  '#2563EB', // azul
+  '#D97706', // ámbar
+  '#0D9488', // teal
+  '#DC2626', // rojo
+  '#7C3AED', // violeta
+  '#16A34A', // verde
+  '#BE185D', // vino / magenta
 ];
 
 /** Agrupa y cuenta items por una clave, de mayor a menor (como en el backend). */

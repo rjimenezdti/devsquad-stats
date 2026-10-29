@@ -312,9 +312,6 @@ function ClientsContent({ data }: { data: UserStoriesReport }) {
           <KpiCard label="User stories" value={formatNumber(data.totalStories)} icon={Layers} accent={palette.primary} />
         </div>
         <div className="col-sm-6 col-xl d-flex">
-          <KpiCard label="Bugs" value={formatNumber(data.totalBugs)} icon={AlertOctagon} accent={palette.orange} />
-        </div>
-        <div className="col-sm-6 col-xl d-flex">
           <KpiCard
             label="Semáforo amarillo"
             value={formatNumber(yellowCount)}
@@ -339,6 +336,9 @@ function ClientsContent({ data }: { data: UserStoriesReport }) {
             icon={AlertTriangle}
             accent={palette.danger}
           />
+        </div>
+        <div className="col-sm-6 col-xl d-flex">
+          <KpiCard label="Bugs" value={formatNumber(data.totalBugs)} icon={AlertOctagon} accent={palette.danger} />
         </div>
       </div>
 
